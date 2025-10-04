@@ -1,37 +1,47 @@
-# Etapa de build
+# -----------------------------
+# Etapa 1 - Build do projeto
+# -----------------------------
 FROM node:20-alpine AS builder
+
 WORKDIR /app
 
-# Copia tudo
-COPY . .
+# Copia todos os manifests necessários
+COPY package*.json ./
+COPY tsconfig.base.json ./
+COPY apps ./apps
+COPY packages ./packages
 
-# Instala dependências (respeitando workspaces)
+# Instala dependências
 RUN npm install
 
-# Gera o cliente Prisma (caso use)
+# Gera cliente Prisma (ignora erros se não houver)
 RUN npx prisma generate --schema=apps/server/prisma/schema.prisma || true
 
-# Builda primeiro o pacote compartilhado
+# Compila o pacote compartilhado
 RUN npm run build -w packages/shared
 
-# Depois builda o servidor
+# Cria link simbólico para o módulo compartilhado dentro de node_modules
+RUN mkdir -p node_modules/@app-disparo && ln -s /app/packages/shared/dist node_modules/@app-disparo/shared
+
+# Compila o servidor
 RUN npm run build -w apps/server
 
-# Etapa final — runtime
-FROM node:20-alpine AS runner
+
+# -----------------------------
+# Etapa 2 - Execução do app
+# -----------------------------
+FROM node:20-alpine
+
 WORKDIR /app
 
-# Copia apenas o necessário do build anterior
+# Copia o build do servidor e shared
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/server/package.json ./apps/server/package.json
+COPY --from=builder /app/packages/shared/dist ./node_modules/@app-disparo/shared
 
-# Define variáveis de ambiente (podem ser sobrescritas no EasyPanel)
-ENV NODE_ENV=production
-ENV PORT=3000
+# Copia o .env (caso exista)
+COPY .env .env
 
 EXPOSE 3000
 
-# Inicia o servidor
 CMD ["node", "apps/server/dist/index.js"]
