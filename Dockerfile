@@ -5,16 +5,19 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copia tudo de uma vez para garantir links corretos dos workspaces
+# Copia tudo (monorepo completo)
 COPY . .
 
 # Instala dependências de todas as workspaces
 RUN npm install
 
-# Gera os tipos compartilhados e builda o pacote compartilhado
+# Gera o cliente do Prisma antes de buildar
+RUN npx prisma generate --schema=apps/server/prisma/schema.prisma
+
+# Builda pacotes compartilhados (ignora se não houver build script)
 RUN npm run build -w packages/shared || true
 
-# Agora builda o servidor
+# Builda o servidor (depois do Prisma estar pronto)
 RUN npm run build -w apps/server
 
 
@@ -25,12 +28,13 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Copia apenas o servidor e o pacote compartilhado (já buildados)
+# Copia os arquivos necessários
 COPY --from=builder /app/apps/server/dist ./dist
 COPY --from=builder /app/apps/server/package*.json ./
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/packages ./packages
 
-# Instala dependências de produção
+# Instala apenas dependências de produção
 RUN npm install --omit=dev
 
 EXPOSE 3000
