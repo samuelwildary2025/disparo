@@ -5,7 +5,7 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copia todos os manifests necessários
+# Copia todos os manifests e código
 COPY package*.json ./
 COPY tsconfig.base.json ./
 COPY apps ./apps
@@ -20,8 +20,8 @@ RUN npx prisma generate --schema=apps/server/prisma/schema.prisma || true
 # Compila o pacote compartilhado
 RUN npm run build -w packages/shared
 
-# Cria link simbólico para o módulo compartilhado dentro de node_modules
-RUN mkdir -p node_modules/@app-disparo && ln -s /app/packages/shared/dist node_modules/@app-disparo/shared
+# Remove link antigo se existir e cria novamente
+RUN mkdir -p node_modules/@app-disparo && rm -rf node_modules/@app-disparo/shared && ln -s /app/packages/shared/dist node_modules/@app-disparo/shared
 
 # Compila o servidor
 RUN npm run build -w apps/server
@@ -39,7 +39,7 @@ COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared/dist ./node_modules/@app-disparo/shared
 
-# Copia o .env (caso exista)
+# Copia o .env se existir
 COPY .env .env
 
 EXPOSE 3000
