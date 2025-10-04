@@ -8,14 +8,15 @@
     "packages/shared"
   ],
   "scripts": {
-    "dev": "npm-run-all --parallel dev:server dev:client",
-    "dev:server": "npm run dev -w apps/server",
-    "dev:client": "npm run dev -w apps/client",
-    "build": "npm-run-all build:server build:client",
-    "build:server": "npm run build -w apps/server",
-    "build:client": "npm run build -w apps/client",
-    "lint": "eslint \"**/*.{ts,tsx}\"",
-    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
+  "start": "npm run start -w apps/server",
+  "dev": "npm-run-all --parallel dev:server dev:client",
+  "dev:server": "npm run dev -w apps/server",
+  "dev:client": "npm run dev -w apps/client",
+  "build": "npm-run-all build:server build:client",
+  "build:server": "npm run build -w apps/server",
+  "build:client": "npm run build -w apps/client",
+  "lint": "eslint \"**/*.{ts,tsx}\"",
+  "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
   },
   "devDependencies": {
     "eslint": "^8.56.0",
