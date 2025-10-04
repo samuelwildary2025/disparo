@@ -101,3 +101,4 @@ Consulte `docs/ARCHITECTURE.md` para detalhes da arquitetura, camadas e modelos.
 
 ---
 Credenciais iniciais após seed: `admin@disparo.app` / `admin123`
+# disparo
