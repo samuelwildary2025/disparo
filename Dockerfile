@@ -1,45 +1,37 @@
-# ========================
-# 1️⃣ Etapa de build
-# ========================
+# Etapa de build
 FROM node:20-alpine AS builder
-
 WORKDIR /app
 
 # Copia tudo
 COPY . .
 
-# Instala dependências de todas as workspaces
+# Instala dependências (respeitando workspaces)
 RUN npm install
 
-# Gera o cliente Prisma
-RUN npx prisma generate --schema=apps/server/prisma/schema.prisma
+# Gera o cliente Prisma (caso use)
+RUN npx prisma generate --schema=apps/server/prisma/schema.prisma || true
 
-# Builda o pacote compartilhado e o servidor
-RUN npm run build -w packages/shared || true
+# Builda primeiro o pacote compartilhado
+RUN npm run build -w packages/shared
+
+# Depois builda o servidor
 RUN npm run build -w apps/server
 
-
-# ========================
-# 2️⃣ Etapa de execução
-# ========================
+# Etapa final — runtime
 FROM node:20-alpine AS runner
-
 WORKDIR /app
 
-# Copia os arquivos do servidor já compilados
-COPY --from=builder /app/apps/server/dist ./dist
-COPY --from=builder /app/apps/server/package*.json ./
-COPY --from=builder /app/packages ./packages
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+# Copia apenas o necessário do build anterior
+COPY --from=builder /app/apps/server/dist ./apps/server/dist
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/server/package.json ./apps/server/package.json
 
-# Instala apenas dependências de produção
-RUN npm install --omit=dev
+# Define variáveis de ambiente (podem ser sobrescritas no EasyPanel)
+ENV NODE_ENV=production
+ENV PORT=3000
 
-# Copia o arquivo .env para dentro do container
-COPY .env .env
-
-# Expõe a porta padrão
 EXPOSE 3000
 
-# Comando para iniciar o app
-CMD ["node", "dist/index.js"]
+# Inicia o servidor
+CMD ["node", "apps/server/dist/index.js"]
