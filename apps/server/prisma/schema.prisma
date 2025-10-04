@@ -1,0 +1,270 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  owner
+  manager
+  operator
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  running
+  paused
+  completed
+  failed
+}
+
+enum DispatchStatus {
+  pending
+  processing
+  success
+  failed
+  cancelled
+}
+
+enum CampaignMode {
+  test
+  live
+}
+
+model User {
+  id           String              @id @default(cuid())
+  email        String              @unique
+  passwordHash String
+  name         String
+  role         Role                @default(manager)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  sessions     Session[]
+  instances    WhatsAppInstance[]
+  templates    MessageTemplate[]
+  contactLists ContactList[]
+  campaigns    Campaign[]
+  blacklist    BlacklistEntry[]
+  settings     SystemSetting[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WhatsAppInstance {
+  id           String          @id @default(cuid())
+  userId       String
+  name         String
+  evolutionUrl String
+  apiKey       String
+  status       String          @default("disconnected")
+  metadata     Json?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+}
+
+model MessageTemplate {
+  id         String   @id @default(cuid())
+  userId     String
+  name       String
+  content    String
+  variables  String[] @default([])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+  campaignSteps CampaignStep[]
+}
+
+model ContactList {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  isDraft     Boolean   @default(true)
+  totalCount  Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contacts Contact[]
+  campaigns Campaign[]
+}
+
+model Contact {
+  id            String      @id @default(cuid())
+  contactListId String
+  name          String
+  phoneNumber   String
+  customFields  Json        @default("{}")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  list ContactList @relation(fields: [contactListId], references: [id], onDelete: Cascade)
+  dispatches MessageDispatch[]
+}
+
+model Campaign {
+  id             String           @id @default(cuid())
+  userId         String
+  instanceId     String
+  templateId     String
+  contactListId  String
+  name           String
+  status         CampaignStatus   @default(draft)
+  mode           CampaignMode     @default(live)
+  testSampleSize Int?
+  scheduleAt     DateTime?
+  antiBanConfig  Json
+  settings       Json?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instance    WhatsAppInstance  @relation(fields: [instanceId], references: [id])
+  template    MessageTemplate   @relation(fields: [templateId], references: [id])
+  contactList ContactList       @relation(fields: [contactListId], references: [id])
+  dispatches  MessageDispatch[]
+  schedules   CampaignSchedule[]
+  events      CampaignEvent[]
+  steps       CampaignStep[]
+}
+
+model CampaignStep {
+  id                 String         @id @default(cuid())
+  campaignId         String
+  order              Int
+  templateId         String
+  delayMinSeconds    Int            @default(0)
+  delayMaxSeconds    Int            @default(0)
+  waitForReplySeconds Int?          // tempo para aguardar resposta antes de disparar próximo step
+  cancelIfReply      Boolean        @default(false)
+  skipIfAutoReply    Boolean        @default(false)
+  typingMsOverride   Int?
+  aiVariation        Boolean        @default(true)
+  metadata           Json?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  campaign   Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  template   MessageTemplate @relation(fields: [templateId], references: [id])
+  stepRuns   DispatchStep[]
+
+  @@unique([campaignId, order])
+}
+
+model CampaignSchedule {
+  id          String   @id @default(cuid())
+  campaignId  String
+  timezone    String
+  allowedWindows Json
+  startAt     DateTime?
+  endAt       DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+model MessageDispatch {
+  id            String          @id @default(cuid())
+  campaignId    String
+  contactId     String
+  status        DispatchStatus  @default(pending)
+  attemptCount  Int             @default(0)
+  lastAttemptAt DateTime?
+  messageBody   String?
+  errorMessage  String?
+  metadata      Json?
+  scheduledAt   DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  campaign Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact  Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  logs     DispatchLog[]
+  steps    DispatchStep[]
+}
+
+model DispatchStep {
+  id               String         @id @default(cuid())
+  dispatchId       String
+  campaignStepId   String
+  status           DispatchStatus @default(pending)
+  scheduledAt      DateTime?
+  sentAt           DateTime?
+  completedAt      DateTime?
+  errorMessage     String?
+  payload          Json?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  dispatch   MessageDispatch @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  campaignStep CampaignStep  @relation(fields: [campaignStepId], references: [id], onDelete: Cascade)
+
+  @@unique([dispatchId, campaignStepId])
+}
+
+model DispatchLog {
+  id           String         @id @default(cuid())
+  dispatchId   String
+  status       DispatchStatus
+  detail       String?
+  payload      Json?
+  createdAt    DateTime       @default(now())
+
+  dispatch MessageDispatch @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+}
+
+model CampaignEvent {
+  id          String   @id @default(cuid())
+  campaignId  String
+  type        String
+  message     String?
+  payload     Json?
+  createdAt   DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+model BlacklistEntry {
+  id          String   @id @default(cuid())
+  userId      String
+  phoneNumber String
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, phoneNumber])
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  userId    String?
+  key       String
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}

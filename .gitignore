@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+coverage/
+tsconfig.tsbuildinfo
+.env
+apps/server/.env
+apps/client/.env
+apps/**/.env.local
+*.sqlite*
+prisma/*.db
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
