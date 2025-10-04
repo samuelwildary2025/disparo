@@ -1,6 +1,4 @@
-]# -----------------------------
-# Etapa 1 - Build do projeto
-# -----------------------------
+
 FROM node:20-alpine AS builder
 
 WORKDIR /app
