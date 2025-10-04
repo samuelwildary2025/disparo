@@ -1,0 +1,15 @@
+# 🌐 Banco de Dados (ajuste conforme necessário)
+DATABASE_URL=postgresql://usuario:senha@wildhub_postgres:5432/disparo
+
+# ⚡ Redis
+REDIS_URL=redis://default:85885885@wildhub_redis:6379
+
+# 🔐 JWT
+JWT_SECRET=uma_chave_segura_aqui
+
+# 🧠 OpenAI (opcional, se não usar pode deixar vazio)
+OPENAI_API_KEY=sk-exemplo1234567890
+
+# 🔄 Evolution API
+EVOLUTION_API_URL=https://api.evolution.com
+EVOLUTION_API_KEY=sua_chave_da_evolution_aqui
